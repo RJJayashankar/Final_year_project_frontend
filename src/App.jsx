@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 
 const BASE_URL = "http://localhost:8000";
 
@@ -7,9 +7,10 @@ const NAV_ITEMS = [
   { id: "mandi", label: "Mandi Prices", icon: "⚖", desc: "Market Data" },
   { id: "predict", label: "Predictions", icon: "◈", desc: "Forecasts" },
   { id: "weather", label: "Weather", icon: "◎", desc: "Current Conditions" },
+  { id: "sensors", label: "Field Sensors", icon: "❖", desc: "NPK · Soil · Climate" },
   { id: "ai", label: "AI Assistant", icon: "✦", desc: "Chat" },
 ];
-
+//new codeeee
 const styles = `
   @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=DM+Sans:wght@300;400;500&display=swap');
 
@@ -30,6 +31,8 @@ const styles = `
     --amber-light: #fef3e2;
     --red: #b84040;
     --red-light: #fdeaea;
+    --blue: #3d5a80;
+    --blue-light: #e8eef5;
     --shadow: 0 2px 12px rgba(44,36,22,0.08);
     --shadow-lg: 0 8px 32px rgba(44,36,22,0.12);
     --radius: 12px;
@@ -91,7 +94,7 @@ const styles = `
   /* Main */
   .main { margin-left: 220px; flex: 1; padding: 40px; min-height: 100vh; }
 
-  .page-header { margin-bottom: 32px; }
+  .page-header { margin-bottom: 32px; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
   .page-title {
     font-family: 'Playfair Display', serif;
     font-size: 28px; font-weight: 700; color: var(--text);
@@ -129,6 +132,7 @@ const styles = `
   .badge-green { background: var(--green-light); color: var(--green); }
   .badge-amber { background: var(--amber-light); color: var(--amber); }
   .badge-red { background: var(--red-light); color: var(--red); }
+  .badge-blue { background: var(--blue-light); color: var(--blue); }
 
   /* Data display */
   .data-block {
@@ -159,6 +163,7 @@ const styles = `
   /* Grid layouts */
   .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   .grid-3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  .grid-4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 16px; }
 
   /* Stat cards */
   .stat-card {
@@ -168,6 +173,28 @@ const styles = `
   .stat-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; }
   .stat-value { font-size: 26px; font-weight: 600; color: var(--text); margin-top: 4px; line-height: 1; }
   .stat-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+  /* Sensor cards */
+  .sensor-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px; position: relative; overflow: hidden;
+    transition: border-color 0.3s;
+  }
+  .sensor-icon { font-size: 22px; margin-bottom: 10px; display: block; }
+  .sensor-label { font-size: 12px; color: var(--text3); text-transform: uppercase; letter-spacing: 0.8px; }
+  .sensor-value { font-size: 30px; font-weight: 600; color: var(--text); margin-top: 6px; line-height: 1; }
+  .sensor-unit { font-size: 14px; color: var(--text3); font-weight: 400; margin-left: 3px; }
+  .sensor-range { font-size: 11px; color: var(--text3); margin-top: 8px; }
+  .sensor-bar-track {
+    width: 100%; height: 5px; background: var(--surface2); border-radius: 3px;
+    margin-top: 10px; overflow: hidden;
+  }
+  .sensor-bar-fill { height: 100%; border-radius: 3px; transition: width 0.6s ease; }
+
+  .live-dot {
+    width: 6px; height: 6px; border-radius: 50%; background: var(--green-mid);
+    display: inline-block; animation: pulse 1.6s infinite;
+  }
 
   /* Home screen */
   .home-hero {
@@ -290,7 +317,7 @@ const styles = `
     .sidebar { width: 60px; }
     .nav-label, .brand-name, .brand-sub, .sidebar-footer { display: none; }
     .main { margin-left: 60px; padding: 24px 16px; }
-    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
   }
 `;
 
@@ -357,6 +384,7 @@ function HomeScreen({ navigate, userId }) {
     { method: "GET", path: "/api/mandi", desc: "List of mandi market data", screen: "mandi" },
     { method: "GET", path: "/api/mandi/predict", desc: "Forecast predictions", screen: "predict" },
     { method: "GET", path: "/api/weather/current", desc: "Current weather info", screen: "weather" },
+    { method: "SIM", path: "/sensors/field", desc: "NPK · soil · climate (simulated)", screen: "sensors" },
     { method: "POST", path: "/api/ai/chat", desc: "AI chatbot interface", screen: "ai" },
   ];
 
@@ -365,7 +393,7 @@ function HomeScreen({ navigate, userId }) {
       <div className="home-hero">
         <div className="hero-tag">AgriDash · Backend Explorer</div>
         <div className="hero-title">Kisan Intelligence<br />Dashboard</div>
-        <div className="hero-sub">Welcome back, <strong>{userId}</strong>. Explore mandi prices, weather, forecasts, and AI assistance.</div>
+        <div className="hero-sub">Welcome back, <strong>{userId}</strong>. Explore mandi prices, weather, forecasts, field sensors, and AI assistance.</div>
       </div>
 
       <div className="grid-2" style={{ marginBottom: 28 }}>
@@ -437,8 +465,10 @@ function MandiScreen() {
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">Mandi Prices</div>
-        <div className="page-subtitle">Live agricultural market data · GET /api/mandi</div>
+        <div>
+          <div className="page-title">Mandi Prices</div>
+          <div className="page-subtitle">Live agricultural market data · GET /api/mandi</div>
+        </div>
       </div>
 
       {/* Filters */}
@@ -560,8 +590,10 @@ function PredictScreen() {
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">Market Predictions</div>
-        <div className="page-subtitle">AI-powered price forecasts · GET /api/mandi/predict</div>
+        <div>
+          <div className="page-title">Market Predictions</div>
+          <div className="page-subtitle">AI-powered price forecasts · GET /api/mandi/predict</div>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
@@ -613,6 +645,7 @@ function PredictScreen() {
     </div>
   );
 }
+
 function WeatherScreen() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -639,8 +672,10 @@ function WeatherScreen() {
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">Current Weather</div>
-        <div className="page-subtitle">Live weather conditions · GET /api/weather/current</div>
+        <div>
+          <div className="page-title">Current Weather</div>
+          <div className="page-subtitle">Live weather conditions · GET /api/weather/current</div>
+        </div>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
@@ -711,6 +746,157 @@ function WeatherScreen() {
   );
 }
 
+// ─── Field Sensors Screen (simulated — no hardware connected) ─────────────────
+
+// Ranges tuned to look like plausible field-sensor readings.
+const SENSOR_DEFS = [
+  { key: "nitrogen", label: "Nitrogen (N)", icon: "🟢", unit: "kg/ha", min: 20, max: 120, decimals: 0, color: "var(--green)" },
+  { key: "phosphorus", label: "Phosphorus (P)", icon: "🟠", unit: "kg/ha", min: 10, max: 60, decimals: 0, color: "var(--amber)" },
+  { key: "potassium", label: "Potassium (K)", icon: "🟣", unit: "kg/ha", min: 20, max: 150, decimals: 0, color: "var(--blue)" },
+  { key: "soilMoisture", label: "Soil Moisture", icon: "💧", unit: "%", min: 15, max: 65, decimals: 1, color: "var(--blue)" },
+  { key: "humidity", label: "Humidity", icon: "🌫", unit: "%", min: 30, max: 90, decimals: 1, color: "var(--green-mid)" },
+  { key: "temperature", label: "Temperature", icon: "🌡", unit: "°C", min: 18, max: 38, decimals: 1, color: "var(--red)" },
+];
+
+function randomInRange(min, max) {
+  return min + Math.random() * (max - min);
+}
+
+function clamp(v, min, max) {
+  return Math.min(max, Math.max(min, v));
+}
+
+// Generates an initial reading set
+function generateInitialReadings() {
+  const readings = {};
+  SENSOR_DEFS.forEach(s => {
+    readings[s.key] = randomInRange(s.min, s.max);
+  });
+  return readings;
+}
+
+// Nudges each value a small random step, so it drifts instead of jumping
+function driftReadings(prev) {
+  const next = {};
+  SENSOR_DEFS.forEach(s => {
+    const range = s.max - s.min;
+    const step = (Math.random() - 0.5) * range * 0.08; // ~8% of range max step
+    next[s.key] = clamp(prev[s.key] + step, s.min, s.max);
+  });
+  return next;
+}
+
+function SensorsScreen() {
+  const [readings, setReadings] = useState(generateInitialReadings);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const intervalRef = useRef(null);
+
+  useEffect(() => {
+    if (!autoRefresh) return;
+    intervalRef.current = setInterval(() => {
+      setReadings(prev => driftReadings(prev));
+      setLastUpdated(new Date());
+    }, 4000);
+    return () => clearInterval(intervalRef.current);
+  }, [autoRefresh]);
+
+  const regenerate = () => {
+    setReadings(generateInitialReadings());
+    setLastUpdated(new Date());
+  };
+
+  const getStatus = (key, value) => {
+    // Simple heuristic bands purely for the simulated demo
+    if (key === "soilMoisture") {
+      if (value < 25) return { label: "Low", cls: "badge-red" };
+      if (value > 55) return { label: "High", cls: "badge-amber" };
+      return { label: "Optimal", cls: "badge-green" };
+    }
+    if (key === "temperature") {
+      if (value > 34) return { label: "Hot", cls: "badge-red" };
+      if (value < 20) return { label: "Cool", cls: "badge-blue" };
+      return { label: "Normal", cls: "badge-green" };
+    }
+    if (key === "humidity") {
+      if (value > 80) return { label: "High", cls: "badge-amber" };
+      if (value < 35) return { label: "Low", cls: "badge-amber" };
+      return { label: "Normal", cls: "badge-green" };
+    }
+    return { label: "Normal", cls: "badge-green" };
+  };
+
+  return (
+    <div>
+      <div className="page-header">
+        <div>
+          <div className="page-title">Field Sensors</div>
+          <div className="page-subtitle">NPK · Soil Moisture · Humidity · Temperature</div>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <span className="badge badge-amber">⚠ No sensor connected · showing simulated data</span>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--text3)" }}>
+            {autoRefresh && <span className="live-dot" />}
+            <span>
+              {autoRefresh ? "Auto-updating every 4s" : "Auto-update paused"} · last updated{" "}
+              {lastUpdated.toLocaleTimeString()}
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button className="btn btn-outline" onClick={() => setAutoRefresh(a => !a)}>
+              {autoRefresh ? "⏸ Pause" : "▶ Resume"}
+            </button>
+            <button className="btn btn-primary" onClick={regenerate}>
+              ↻ New Reading
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid-3">
+        {SENSOR_DEFS.map(s => {
+          const value = readings[s.key];
+          const pct = ((value - s.min) / (s.max - s.min)) * 100;
+          const status = getStatus(s.key, value);
+          return (
+            <div key={s.key} className="sensor-card">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <span className="sensor-icon">{s.icon}</span>
+                <span className={`badge ${status.cls}`}>{status.label}</span>
+              </div>
+              <div className="sensor-label">{s.label}</div>
+              <div className="sensor-value">
+                {value.toFixed(s.decimals)}<span className="sensor-unit">{s.unit}</span>
+              </div>
+              <div className="sensor-bar-track">
+                <div className="sensor-bar-fill" style={{ width: `${pct}%`, background: s.color }} />
+              </div>
+              <div className="sensor-range">Range {s.min}–{s.max} {s.unit}</div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <div style={{ fontWeight: 600, fontSize: 15, marginBottom: 4 }}>Raw Reading</div>
+        <div style={{ fontSize: 13, color: "var(--text3)" }}>Simulated payload — swap this screen's data source for a real endpoint (e.g. GET /api/sensors/field) once hardware is wired up.</div>
+        <div className="data-block">
+          {JSON.stringify(
+            Object.fromEntries(SENSOR_DEFS.map(s => [s.key, Number(readings[s.key].toFixed(s.decimals))])),
+            null,
+            2
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AiScreen({ userId }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -726,7 +912,7 @@ function AiScreen({ userId }) {
     try {
       const res = await fetch(`${BASE_URL}/api/ai/chat`, {
         method: "POST",
-        headers: { 
+        headers: {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
@@ -746,8 +932,10 @@ function AiScreen({ userId }) {
   return (
     <div>
       <div className="page-header">
-        <div className="page-title">AI Assistant</div>
-        <div className="page-subtitle">Chatting as <strong>{userId}</strong> · POST /api/ai/chat</div>
+        <div>
+          <div className="page-title">AI Assistant</div>
+          <div className="page-subtitle">Chatting as <strong>{userId}</strong> · POST /api/ai/chat</div>
+        </div>
       </div>
 
       <div className="chat-wrap">
@@ -824,6 +1012,7 @@ export default function App() {
     mandi: <MandiScreen />,
     predict: <PredictScreen />,
     weather: <WeatherScreen />,
+    sensors: <SensorsScreen />,
     ai: <AiScreen userId={userId} />,
   };
 
